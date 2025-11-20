@@ -1,0 +1,223 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          timeout: 10m
+          command_timeout: 10m
+          script: |
+            set -e  # Останавливать выполнение при любой ошибке
+
+            PROJECT_DIR="/home/multistream"
+            SCREEN_NAME="multistream"
+            PORT="${PORT:-3000}"  # Порт приложения для health check
+
+            echo "=== Начало деплоя ==="
+
+            # Проверка существования директории
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "❌ Ошибка: директория $PROJECT_DIR не существует"
+              exit 1
+            fi
+
+            cd "$PROJECT_DIR"
+
+            # Сохранение текущего коммита для возможного отката
+            CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+            echo "Текущий коммит: $CURRENT_COMMIT"
+
+            # Создание бэкапа (если существует .next)
+            if [ -d ".next" ]; then
+              echo "📦 Создание резервной копии сборки..."
+              rm -rf .next.backup 2>/dev/null || true
+              cp -r .next .next.backup
+            fi
+
+            # Graceful shutdown с таймаутом
+            if screen -list | grep -q "$SCREEN_NAME"; then
+              echo "🛑 Остановка текущего процесса..."
+              screen -S "$SCREEN_NAME" -X stuff "^C"
+              
+              # Ждем graceful shutdown (максимум 10 секунд)
+              for i in {1..10}; do
+                if ! screen -list | grep -q "$SCREEN_NAME"; then
+                  echo "✓ Процесс остановлен корректно"
+                  break
+                fi
+                sleep 1
+              done
+              
+              # Принудительное завершение если не остановился
+              screen -S "$SCREEN_NAME" -X quit 2>/dev/null || true
+              sleep 2
+            fi
+
+            # Функция отката
+            rollback() {
+              echo "🔄 Откат к предыдущей версии..."
+              
+              if [ "$CURRENT_COMMIT" != "none" ]; then
+                git reset --hard "$CURRENT_COMMIT" 2>/dev/null || true
+              fi
+              
+              if [ -d ".next.backup" ]; then
+                rm -rf .next
+                mv .next.backup .next
+              fi
+              
+              if [ -d "node_modules.backup" ]; then
+                rm -rf node_modules
+                mv node_modules.backup node_modules
+              fi
+              
+              # Запуск предыдущей версии
+              screen -dmS "$SCREEN_NAME" bash -c "cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log" || true
+              sleep 3
+              
+              echo "❌ Деплой провален. Восстановлена предыдущая версия."
+              exit 1
+            }
+
+            # Trap для автоматического отката при ошибке
+            trap rollback ERR
+
+            # Получение обновлений
+            echo "📥 Получение обновлений из репозитория..."
+            git fetch origin || { echo "❌ Ошибка git fetch"; exit 1; }
+            git checkout main || { echo "❌ Ошибка git checkout"; exit 1; }
+            git pull origin main || { echo "❌ Ошибка git pull"; exit 1; }
+
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "Новый коммит: $NEW_COMMIT"
+
+            if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ] && [ "$CURRENT_COMMIT" != "none" ]; then
+              echo "ℹ️  Нет новых изменений для деплоя"
+            fi
+
+            # Управление зависимостями
+            if [ -d "node_modules" ]; then
+              echo "💾 Сохранение node_modules..."
+              mv node_modules node_modules.backup || true
+            fi
+
+            # Проверка необходимости переустановки зависимостей
+            NEED_INSTALL=false
+            if [ ! -d "node_modules.backup" ]; then
+              NEED_INSTALL=true
+            elif [ ! -f "node_modules.backup/.package-lock.json" ]; then
+              NEED_INSTALL=true
+            elif ! cmp -s "package-lock.json" "node_modules.backup/.package-lock.json" 2>/dev/null; then
+              NEED_INSTALL=true
+            fi
+
+            if [ "$NEED_INSTALL" = true ]; then
+              echo "📦 Установка зависимостей..."
+              rm -rf node_modules.backup
+              npm ci --production=false || { echo "❌ Ошибка npm ci"; exit 1; }
+              cp package-lock.json node_modules/.package-lock.json
+            else
+              echo "♻️  Использование кэшированных зависимостей..."
+              rm -rf node_modules
+              mv node_modules.backup node_modules
+            fi
+
+            # Очистка старой сборки
+            rm -rf .next
+
+            # Сборка приложения
+            echo "🔨 Сборка приложения..."
+            NODE_ENV=production npm run build || { echo "❌ Ошибка сборки"; exit 1; }
+
+            # Создание директории для логов если не существует
+            mkdir -p logs
+
+            # Запуск приложения
+            echo "🚀 Запуск приложения..."
+            screen -dmS "$SCREEN_NAME" bash -c "cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log"
+
+            # Health check с ретраями
+            echo "🔍 Проверка работоспособности приложения..."
+            MAX_RETRIES=30
+            RETRY_COUNT=0
+            APP_STARTED=false
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              sleep 2
+              
+              # Проверка screen сессии
+              if ! screen -list | grep -q "$SCREEN_NAME"; then
+                echo "❌ Screen сессия не запущена"
+                exit 1
+              fi
+              
+              # Проверка HTTP endpoint (если доступен)
+              if command -v curl &> /dev/null; then
+                if curl -sf "http://localhost:$PORT" > /dev/null 2>&1; then
+                  echo "✅ Приложение успешно запущено и отвечает на запросы"
+                  APP_STARTED=true
+                  break
+                fi
+              else
+                # Если curl недоступен, просто проверяем screen
+                if [ $RETRY_COUNT -eq 10 ]; then
+                  echo "✅ Screen сессия активна (curl недоступен для HTTP проверки)"
+                  APP_STARTED=true
+                  break
+                fi
+              fi
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              
+              if [ $((RETRY_COUNT % 5)) -eq 0 ]; then
+                echo "Попытка $RETRY_COUNT/$MAX_RETRIES..."
+              fi
+            done
+
+            if [ "$APP_STARTED" = false ]; then
+              echo "❌ Приложение не запустилось за отведенное время (60 секунд)"
+              echo "📋 Последние строки лога:"
+              tail -n 20 logs/app.log 2>/dev/null || echo "Лог недоступен"
+              exit 1
+            fi
+
+            # Очистка бэкапов при успешном деплое
+            echo "🧹 Очистка временных файлов..."
+            rm -rf .next.backup node_modules.backup 2>/dev/null || true
+
+            # Отключаем trap после успешного деплоя
+            trap - ERR
+
+            echo ""
+            echo "======================================"
+            echo "✅ Деплой завершён успешно!"
+            echo "📍 Коммит: $NEW_COMMIT"
+            echo "🖥️  Screen сессия: $SCREEN_NAME"
+            echo "📊 Логи: $PROJECT_DIR/logs/app.log"
+            echo "======================================"
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Деплой выполнен успешно на $(date)"
+          # Здесь можно добавить отправку уведомлений (Telegram, Slack, Discord)
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Деплой провален на $(date)"
+          # Здесь можно добавить отправку уведомлений об ошибке

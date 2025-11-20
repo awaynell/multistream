@@ -14,32 +14,16 @@ export function StreamGrid() {
 
   // Функция получения конфигурации сетки
   const getGridConfig = useCallback(() => {
-    if (layout.type === "preset" && layout.preset) {
-      switch (layout.preset) {
-        case "1x1":
-          return { cols: 1, rows: 1, gridSize: "2x2" as const };
-        case "2x1":
-          return { cols: 2, rows: 1, gridSize: "2x2" as const };
-        case "1+2":
-          return { cols: 2, rows: 2, gridSize: "2x2" as const };
-        case "2x2":
-          return { cols: 2, rows: 2, gridSize: "2x2" as const };
-        case "3x3":
-          return { cols: 3, rows: 3, gridSize: "3x3" as const };
-        default:
-          return { cols: 2, rows: 2, gridSize: "2x2" as const };
-      }
-    } else if (layout.type === "custom" && layout.custom) {
-      const cols = layout.custom.cols;
-      const rows = layout.custom.rows;
-      return {
-        cols,
-        rows,
-        gridSize:
-          cols === 3 && rows === 3 ? ("3x3" as const) : ("2x2" as const),
-      };
+    switch (layout.preset) {
+      case "1x1":
+        return { cols: 1, rows: 1, gridSize: "1x1" as const };
+      case "2x2":
+        return { cols: 2, rows: 2, gridSize: "2x2" as const };
+      case "3x3":
+        return { cols: 3, rows: 3, gridSize: "3x3" as const };
+      default:
+        return { cols: 2, rows: 2, gridSize: "2x2" as const };
     }
-    return { cols: 2, rows: 2, gridSize: "2x2" as const };
   }, [layout]);
 
   const getStreamerById = useCallback(
@@ -84,19 +68,6 @@ export function StreamGrid() {
       };
     });
   }, [displayStreamers, hostname]);
-
-  // Специальная обработка для лейаута 1+2 - используем старую реализацию
-  if (layout.type === "preset" && layout.preset === "1+2") {
-    // Для этого лейаута пока используем старую реализацию
-    // Можно будет адаптировать MultistreamGrid позже
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <p className="text-center text-xl text-base-content/60">
-          Лейаут 1+2 временно не поддерживается в новой версии
-        </p>
-      </div>
-    );
-  }
 
   const handleRemoveStream = useCallback((streamId: string) => {
     removeStreamer(streamId);

@@ -1,25 +1,18 @@
 export interface Streamer {
-  id: string
-  username: string
-  platform: 'twitch' | 'kick' | 'goodgame' | 'vkplay'
+  id: string;
+  username: string;
+  platform: "twitch" | "kick" | "goodgame" | "vkplay";
 }
 
-export type LayoutPreset = '1x1' | '2x1' | '1+2' | '2x2' | '3x3'
-
-export interface CustomLayout {
-  cols: number
-  rows: number
-}
+export type LayoutPreset = "1x1" | "2x2" | "3x3";
 
 export interface Layout {
-  type: 'preset' | 'custom'
-  preset?: LayoutPreset
-  custom?: CustomLayout
+  type: "preset";
+  preset: LayoutPreset;
 }
 
 export interface AppData {
-  streamers: Streamer[]
-  layout: Layout
-  selectedStreams: string[] // id стримеров для отображения в лейауте
+  streamers: Streamer[];
+  layout: Layout;
+  selectedStreams: string[]; // id стримеров для отображения в лейауте
 }
-

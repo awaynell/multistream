@@ -15,7 +15,7 @@ export type Stream = {
 
 interface MultistreamGridProps {
   streams: Stream[];
-  gridSize?: "2x2" | "3x3";
+  gridSize?: "1x1" | "2x2" | "3x3";
   className?: string;
   onRemoveStream?: (streamId: string) => void;
 }
@@ -42,7 +42,9 @@ export function MultistreamGrid({
   }, [theatreMode]);
 
   const gridConfig = useMemo(() => {
-    if (gridSize === "2x2") {
+    if (gridSize === "1x1") {
+      return { cols: 1, rows: 1 };
+    } else if (gridSize === "2x2") {
       return { cols: 2, rows: 2 };
     } else {
       return { cols: 3, rows: 3 };

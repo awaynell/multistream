@@ -6,10 +6,7 @@ import { Users, Grid3x3 } from "lucide-react";
 export function Header() {
   const { streamers, layout } = useApp();
 
-  const layoutText =
-    layout.type === "preset"
-      ? layout.preset
-      : `${layout.custom?.cols}x${layout.custom?.rows}`;
+  const layoutText = layout.preset;
 
   return (
     <header className="flex items-center justify-between border-b border-base-300 bg-base-100 px-4 py-2">

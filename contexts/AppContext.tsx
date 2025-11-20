@@ -9,14 +9,13 @@ import {
   useMemo,
   ReactNode,
 } from "react";
-import { Layout, LayoutPreset, CustomLayout, Streamer } from "@/types";
+import { Layout, LayoutPreset, Streamer } from "@/types";
 import { parseTwitchInput } from "@/utils/twitch";
 
 interface AppContextType {
   // Layout
   layout: Layout;
   setPresetLayout: (preset: LayoutPreset) => void;
-  setCustomLayout: (custom: CustomLayout) => void;
 
   // Streamers
   streamers: Streamer[];
@@ -101,12 +100,6 @@ export function AppProvider({ children }: AppProviderProps) {
     });
   }, []);
 
-  const setCustomLayout = useCallback((custom: CustomLayout) => {
-    setLayout({
-      type: "custom",
-      custom,
-    });
-  }, []);
 
   const addStreamer = useCallback((input: string) => {
     const username = parseTwitchInput(input);
@@ -145,7 +138,6 @@ export function AppProvider({ children }: AppProviderProps) {
     () => ({
       layout,
       setPresetLayout,
-      setCustomLayout,
       streamers,
       addStreamer,
       removeStreamer,
@@ -155,7 +147,6 @@ export function AppProvider({ children }: AppProviderProps) {
     [
       layout,
       setPresetLayout,
-      setCustomLayout,
       streamers,
       addStreamer,
       removeStreamer,
