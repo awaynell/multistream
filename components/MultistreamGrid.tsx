@@ -164,59 +164,62 @@ export function MultistreamGrid({
 
   return (
     <>
-      <div
-        className={`grid h-full gap-2 p-2 ${className}`}
-        style={{
-          gridTemplateColumns: `repeat(${gridConfig.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${gridConfig.rows}, 1fr)`,
-        }}
-      >
-        {Array.from({ length: gridConfig.cols * gridConfig.rows }).map(
-          (_, index) => {
-            const stream = displayStreams[index];
-            const isDragged = draggedIndex === index;
-            const isDragOver = dragOverIndex === index;
+      <div className="relative h-full w-full">
+        <div
+          className={`grid h-full gap-2 p-2 ${className}`}
+          style={{
+            gridTemplateColumns: `repeat(${gridConfig.cols}, 1fr)`,
+            gridTemplateRows: `repeat(${gridConfig.rows}, 1fr)`,
+          }}
+        >
+          {Array.from({ length: gridConfig.cols * gridConfig.rows }).map(
+            (_, index) => {
+              const stream = displayStreams[index];
+              const isDragged = draggedIndex === index;
+              const isDragOver = dragOverIndex === index;
 
-            if (!stream) {
+              if (!stream) {
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    className={`flex min-h-[200px] items-center justify-center rounded-lg bg-base-200 transition-all ${
+                      isDragOver ? "ring-2 ring-primary ring-offset-2" : ""
+                    }`}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <p className="text-base-content/60">Пусто</p>
+                  </div>
+                );
+              }
+
+              // Всегда рендерим StreamTile, даже в театральном режиме
+              // чтобы iframe не размонтировался
               return (
-                <div
-                  key={`empty-${index}`}
-                  className={`flex min-h-[200px] items-center justify-center rounded-lg bg-base-200 transition-all ${
-                    isDragOver ? "ring-2 ring-primary ring-offset-2" : ""
-                  }`}
+                <StreamTile
+                  key={stream.id}
+                  stream={stream}
+                  isTheatreMode={theatreMode === stream.id}
+                  isAnyTheatreModeActive={!!theatreMode}
+                  onTheatreModeToggle={() => handleTheatreToggle(stream.id)}
+                  onRemove={
+                    onRemoveStream
+                      ? () => handleRemoveClick(stream.id)
+                      : undefined
+                  }
+                  isDragged={isDragged}
+                  isDragOver={isDragOver}
+                  onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
-                >
-                  <p className="text-base-content/60">Пусто</p>
-                </div>
+                  onDragEnd={handleDragEnd}
+                />
               );
             }
-
-            // Всегда рендерим StreamTile, даже в театральном режиме
-            // чтобы iframe не размонтировался
-            return (
-              <StreamTile
-                key={stream.id}
-                stream={stream}
-                isTheatreMode={theatreMode === stream.id}
-                onTheatreModeToggle={() => handleTheatreToggle(stream.id)}
-                onRemove={
-                  onRemoveStream
-                    ? () => handleRemoveClick(stream.id)
-                    : undefined
-                }
-                isDragged={isDragged}
-                isDragOver={isDragOver}
-                onDragStart={() => handleDragStart(index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-              />
-            );
-          }
-        )}
+          )}
+        </div>
       </div>
 
       <AnimatePresence mode="sync">
@@ -247,6 +250,7 @@ export function MultistreamGrid({
 interface StreamTileProps {
   stream: Stream;
   isTheatreMode: boolean;
+  isAnyTheatreModeActive: boolean;
   onTheatreModeToggle: () => void;
   onRemove?: () => void;
   isDragged?: boolean;
@@ -261,6 +265,7 @@ interface StreamTileProps {
 const StreamTile = ({
   stream,
   isTheatreMode,
+  isAnyTheatreModeActive,
   onTheatreModeToggle,
   onRemove,
   isDragged = false,
@@ -273,6 +278,11 @@ const StreamTile = ({
 }: StreamTileProps) => {
   // Критически важно: НЕ удаляем плитку из DOM в театральном режиме
   // Это гарантирует, что iframe останется в DOM и не перезагрузится
+
+  // Применяем блюр только к элементам, которые НЕ в театральном режиме,
+  // когда какой-то другой элемент в театральном режиме
+  const shouldBlur = isAnyTheatreModeActive && !isTheatreMode;
+
   return (
     <div
       draggable={!isTheatreMode}
@@ -293,7 +303,7 @@ const StreamTile = ({
           : "opacity-100 cursor-move"
       } ${isDragged ? "opacity-50 scale-95" : ""} ${
         isDragOver ? "ring-2 ring-primary ring-offset-2 scale-105" : ""
-      }`}
+      } ${shouldBlur ? "blur-md" : ""}`}
     >
       <StreamPlayer
         streamId={stream.id}
@@ -358,6 +368,9 @@ interface TheatreModeViewProps {
 }
 
 const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
+  const playerRef = useRef<HTMLDivElement>(null);
+  const [maskStyle, setMaskStyle] = useState<React.CSSProperties>({});
+
   // Блокируем скролл body при открытии театрального режима
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -366,14 +379,69 @@ const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
     };
   }, []);
 
+  // Вычисляем позицию и размеры плеера для маски
+  useEffect(() => {
+    const updateMask = () => {
+      if (!playerRef.current) return;
+
+      const rect = playerRef.current.getBoundingClientRect();
+
+      // Вычисляем позицию относительно viewport (так как overlay fixed)
+      const left = rect.left;
+      const top = rect.top;
+      const width = rect.width;
+      const height = rect.height;
+
+      // Создаем маску с вырезом для плеера используя clip-path
+      // Покрываем всё кроме области плеера
+      const clipPath = `polygon(
+        0% 0%, 
+        0% 100%, 
+        ${left}px 100%, 
+        ${left}px ${top}px, 
+        ${left + width}px ${top}px, 
+        ${left + width}px ${top + height}px, 
+        ${left}px ${top + height}px, 
+        ${left}px 100%, 
+        100% 100%, 
+        100% 0%
+      )`;
+
+      setMaskStyle({
+        clipPath,
+      });
+    };
+
+    updateMask();
+    const interval = setInterval(updateMask, 100); // Обновляем каждые 100мс для плавности
+    window.addEventListener("resize", updateMask);
+    window.addEventListener("scroll", updateMask);
+
+    // Обновляем маску с небольшой задержкой для анимации
+    const timeout = setTimeout(updateMask, 100);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("resize", updateMask);
+      window.removeEventListener("scroll", updateMask);
+      clearTimeout(timeout);
+    };
+  }, [stream.chatUrl]);
+
   return (
     <>
-      {/* Фон театрального режима - ВРЕМЕННО ОТКЛЮЧЕН ДЛЯ ТЕСТИРОВАНИЯ */}
-      {/* <div
-        className="fixed top-0 bg-stale-600/70 h-screen w-screen pointer-events-auto"
-        style={{ zIndex: 40 }}
-        onClick={onClose}
-      /> */}
+      {/* Overlay с блюром для сетки, исключающий область плеера */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 backdrop-blur-md bg-base-300/20 pointer-events-none"
+        style={{
+          zIndex: 50,
+          ...maskStyle,
+        }}
+      />
 
       {/* Контейнер театрального режима - pointer-events разрешены для дочерних элементов */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
@@ -381,6 +449,7 @@ const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
         <div className="relative flex items-center justify-center gap-2 w-full h-full max-w-[1920px] max-h-[1080px] pointer-events-none">
           {/* Плеер - отдельное окно, БЕЗ z-index чтобы не создавать контекст стекирования */}
           <motion.div
+            ref={playerRef}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
