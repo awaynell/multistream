@@ -6,7 +6,13 @@ import { MultistreamGrid, Stream } from "./MultistreamGrid";
 import { getTwitchEmbedUrl } from "@/utils/twitch";
 
 export function StreamGrid() {
-  const { layout, selectedStreams, streamers, removeStreamer } = useApp();
+  const {
+    layout,
+    selectedStreams,
+    streamers,
+    removeStreamer,
+    reorderSelectedStreams,
+  } = useApp();
 
   // Получаем hostname для Twitch embed
   const hostname =
@@ -39,16 +45,12 @@ export function StreamGrid() {
   }, [getGridConfig]);
 
   // Получаем стримеров для отображения
+  // Показываем только стримеров из selectedStreams
   const displayStreamers = useMemo(() => {
-    const streamsToShow = selectedStreams
+    return selectedStreams
       .map((id) => getStreamerById(id))
       .filter((s): s is NonNullable<typeof s> => s !== undefined)
       .slice(0, gridConfig.cols * gridConfig.rows);
-
-    // Если не выбраны стримеры, показываем первые доступные
-    return streamsToShow.length > 0
-      ? streamsToShow
-      : streamers.slice(0, gridConfig.cols * gridConfig.rows);
   }, [selectedStreams, streamers, getStreamerById, gridConfig]);
 
   // Преобразуем Streamer[] в Stream[] для MultistreamGrid
@@ -69,15 +71,28 @@ export function StreamGrid() {
     });
   }, [displayStreamers, hostname]);
 
-  const handleRemoveStream = useCallback((streamId: string) => {
-    removeStreamer(streamId);
-  }, [removeStreamer]);
+  const handleRemoveStream = useCallback(
+    (streamId: string) => {
+      removeStreamer(streamId);
+    },
+    [removeStreamer]
+  );
+
+  const handleReorderStreams = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      reorderSelectedStreams(fromIndex, toIndex);
+    },
+    [reorderSelectedStreams]
+  );
 
   return (
-    <MultistreamGrid
-      streams={streams}
-      gridSize={gridConfig.gridSize}
-      onRemoveStream={handleRemoveStream}
-    />
+    <>
+      <MultistreamGrid
+        streams={streams}
+        gridSize={gridConfig.gridSize}
+        onRemoveStream={handleRemoveStream}
+        onReorderStreams={handleReorderStreams}
+      />
+    </>
   );
 }

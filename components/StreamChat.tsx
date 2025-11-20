@@ -42,4 +42,3 @@ export const StreamChat = memo(function StreamChat({ url }: StreamChatProps) {
     </motion.div>
   );
 });
-

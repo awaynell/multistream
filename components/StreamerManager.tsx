@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/contexts/AppContext";
-import { X } from "lucide-react";
+import { X, Eye, EyeOff, GripVertical } from "lucide-react";
 import { parseTwitchInput } from "@/utils/twitch";
 
 interface FormData {
@@ -12,7 +13,17 @@ interface FormData {
 
 // Общий компонент для управления стримерами
 function StreamerManagerContent() {
-  const { streamers, addStreamer, removeStreamer } = useApp();
+  const {
+    streamers,
+    addStreamer,
+    removeStreamer,
+    selectedStreams,
+    reorderSelectedStreams,
+    toggleStreamVisibility,
+    updateSelectedStreams,
+  } = useApp();
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const {
     register,
     handleSubmit,
@@ -60,6 +71,100 @@ function StreamerManagerContent() {
       });
     }
   };
+
+  // Получаем порядок стримеров на основе selectedStreams, затем добавляем остальных
+  const orderedStreamers = useCallback(() => {
+    const ordered: typeof streamers = [];
+    const addedIds = new Set<string>();
+
+    // Сначала добавляем стримеров в порядке selectedStreams
+    selectedStreams.forEach((id) => {
+      const streamer = streamers.find((s) => s.id === id);
+      if (streamer) {
+        ordered.push(streamer);
+        addedIds.add(streamer.id);
+      }
+    });
+
+    // Затем добавляем остальных стримеров
+    streamers.forEach((streamer) => {
+      if (!addedIds.has(streamer.id)) {
+        ordered.push(streamer);
+      }
+    });
+
+    return ordered;
+  }, [streamers, selectedStreams]);
+
+  const handleDragStart = useCallback((index: number) => {
+    setDraggedIndex(index);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, index: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (draggedIndex !== null && draggedIndex !== index) {
+        setDragOverIndex(index);
+      }
+    },
+    [draggedIndex]
+  );
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (draggedIndex !== null && draggedIndex !== dropIndex) {
+        const ordered = orderedStreamers();
+        const fromId = ordered[draggedIndex].id;
+        const toId = ordered[dropIndex].id;
+
+        // Находим индексы в selectedStreams
+        const fromSelectedIndex = selectedStreams.indexOf(fromId);
+        const toSelectedIndex = selectedStreams.indexOf(toId);
+
+        // Если оба стримера в selectedStreams - меняем порядок
+        if (fromSelectedIndex !== -1 && toSelectedIndex !== -1) {
+          reorderSelectedStreams(fromSelectedIndex, toSelectedIndex);
+        }
+        // Если перетаскиваем видимого стримера на невидимого - добавляем невидимого в selectedStreams
+        else if (fromSelectedIndex !== -1 && toSelectedIndex === -1) {
+          // Добавляем toId в selectedStreams после fromId
+          const newSelected = [...selectedStreams];
+          const insertIndex = fromSelectedIndex + 1;
+          newSelected.splice(insertIndex, 0, toId);
+          updateSelectedStreams(newSelected);
+        }
+        // Если перетаскиваем невидимого на видимого - добавляем невидимого в selectedStreams
+        else if (fromSelectedIndex === -1 && toSelectedIndex !== -1) {
+          const newSelected = [...selectedStreams];
+          newSelected.splice(toSelectedIndex, 0, fromId);
+          updateSelectedStreams(newSelected);
+        }
+      }
+
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+    },
+    [
+      draggedIndex,
+      orderedStreamers,
+      selectedStreams,
+      reorderSelectedStreams,
+      updateSelectedStreams,
+    ]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,30 +216,69 @@ function StreamerManagerContent() {
 
         <div className="max-h-[400px] overflow-y-auto">
           <AnimatePresence>
-            {streamers.map((streamer) => (
-              <motion.div
-                key={streamer.id}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="card bg-base-200 p-3 mb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex-1 text-base-content">
-                      {streamer.username}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-circle btn-sm btn-error"
-                      onClick={() => removeStreamer(streamer.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+            {orderedStreamers().map((streamer, index) => {
+              const isVisible = selectedStreams.includes(streamer.id);
+              const isDragged = draggedIndex === index;
+              const isDragOver = dragOverIndex === index;
+
+              return (
+                <motion.div
+                  key={streamer.id}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", streamer.id);
+                      handleDragStart(index);
+                    }}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`card bg-base-200 p-3 mb-2 transition-all cursor-move ${
+                      isDragged ? "opacity-50 scale-95" : ""
+                    } ${isDragOver ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <GripVertical className="h-4 w-4 text-base-content/40 shrink-0" />
+                      <span
+                        className={`flex-1 text-base-content ${
+                          !isVisible ? "opacity-50 line-through" : ""
+                        }`}
+                      >
+                        {streamer.username}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-circle btn-sm btn-ghost"
+                        onClick={() => toggleStreamVisibility(streamer.id)}
+                        title={
+                          isVisible ? "Скрыть из сетки" : "Показать в сетке"
+                        }
+                      >
+                        {isVisible ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-circle btn-sm btn-error"
+                        onClick={() => removeStreamer(streamer.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {streamers.length === 0 && (

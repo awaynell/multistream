@@ -7,6 +7,7 @@ interface StreamPlayerProps {
   streamId: string;
   url: string;
   isActive?: boolean; // true = этот плеер активен и должен управлять iframe
+  isTheatreMode?: boolean; // true = этот плеер в театральном режиме
 }
 
 // Глобальный контейнер для всех iframe
@@ -28,7 +29,8 @@ const getIframeContainer = () => {
       iframeContainer.style.width = "0";
       iframeContainer.style.height = "0";
       iframeContainer.style.pointerEvents = "none";
-      iframeContainer.style.zIndex = "1";
+      // НЕ устанавливаем z-index для контейнера, чтобы не создавать контекст стекирования
+      // Каждый iframe управляет своим z-index индивидуально
       document.body.appendChild(iframeContainer);
     }
   }
@@ -39,6 +41,7 @@ export const StreamPlayer = memo(function StreamPlayer({
   streamId,
   url,
   isActive = true, // По умолчанию активен
+  isTheatreMode = false, // По умолчанию не в театральном режиме
 }: StreamPlayerProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const positionUpdateRef = useRef<number>(0);
@@ -58,10 +61,18 @@ export const StreamPlayer = memo(function StreamPlayer({
       iframe.style.width = "100%";
       iframe.style.height = "100%";
       iframe.style.pointerEvents = "auto";
-      iframe.style.zIndex = "1"; // Простой z-index, контейнер управляет слоями
       iframe.style.transition = "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)"; // Плавный переход
+      iframe.style.borderRadius = "8px"; // Округление границ (rounded-lg)
       container.appendChild(iframe);
       iframes.set(streamId, iframe);
+    }
+
+    // Устанавливаем z-index для iframe в зависимости от режима
+    // Каждый iframe управляет своим z-index индивидуально
+    if (isTheatreMode) {
+      iframe.style.zIndex = "3"; // Выше фона (98), но ниже чата и кнопок
+    } else {
+      iframe.style.zIndex = "2"; // В сетке
     }
 
     // ТОЛЬКО АКТИВНЫЙ плеер управляет позицией iframe
@@ -155,9 +166,15 @@ export const StreamPlayer = memo(function StreamPlayer({
         }
       }
     };
-  }, [streamId, url, isActive]);
+  }, [streamId, url, isActive, isTheatreMode]);
 
   return (
-    <div ref={anchorRef} className="w-full h-full" data-stream-id={streamId} />
+    <div className="relative w-full h-full overflow-hidden rounded-lg translate-y-0">
+      <div
+        ref={anchorRef}
+        className="w-full h-full overflow-hidden rounded-lg"
+        data-stream-id={streamId}
+      />
+    </div>
   );
 });

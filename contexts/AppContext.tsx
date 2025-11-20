@@ -25,6 +25,8 @@ interface AppContextType {
   // Selected streams
   selectedStreams: string[];
   updateSelectedStreams: (streamIds: string[]) => void;
+  reorderSelectedStreams: (fromIndex: number, toIndex: number) => void;
+  toggleStreamVisibility: (streamId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -58,9 +60,18 @@ export function AppProvider({ children }: AppProviderProps) {
         setLayout(JSON.parse(savedLayout));
       }
       if (savedStreamers) {
-        setStreamers(JSON.parse(savedStreamers));
-      }
-      if (savedSelected) {
+        const parsedStreamers = JSON.parse(savedStreamers);
+        setStreamers(parsedStreamers);
+
+        // Если selectedStreams пустой, но есть стримеры, добавляем всех в selectedStreams
+        if (savedSelected) {
+          const parsedSelected = JSON.parse(savedSelected);
+          setSelectedStreams(parsedSelected);
+        } else if (parsedStreamers.length > 0) {
+          // Если нет сохраненных selectedStreams, но есть стримеры, добавляем всех
+          setSelectedStreams(parsedStreamers.map((s: Streamer) => s.id));
+        }
+      } else if (savedSelected) {
         setSelectedStreams(JSON.parse(savedSelected));
       }
     } catch (error) {
@@ -100,7 +111,6 @@ export function AppProvider({ children }: AppProviderProps) {
     });
   }, []);
 
-
   const addStreamer = useCallback((input: string) => {
     const username = parseTwitchInput(input);
 
@@ -123,6 +133,14 @@ export function AppProvider({ children }: AppProviderProps) {
     };
 
     setStreamers((prev) => [...prev, newStreamer]);
+
+    // Автоматически добавляем новый стример в selectedStreams, если его там еще нет
+    setSelectedStreams((prev) => {
+      if (!prev.includes(newStreamer.id)) {
+        return [...prev, newStreamer.id];
+      }
+      return prev;
+    });
   }, []);
 
   const removeStreamer = useCallback((id: string) => {
@@ -134,6 +152,30 @@ export function AppProvider({ children }: AppProviderProps) {
     setSelectedStreams(streamIds);
   }, []);
 
+  const reorderSelectedStreams = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setSelectedStreams((prev) => {
+        const newOrder = [...prev];
+        const [removed] = newOrder.splice(fromIndex, 1);
+        newOrder.splice(toIndex, 0, removed);
+        return newOrder;
+      });
+    },
+    []
+  );
+
+  const toggleStreamVisibility = useCallback((streamId: string) => {
+    setSelectedStreams((prev) => {
+      if (prev.includes(streamId)) {
+        // Скрываем стримера
+        return prev.filter((id) => id !== streamId);
+      } else {
+        // Показываем стримера (добавляем в конец)
+        return [...prev, streamId];
+      }
+    });
+  }, []);
+
   const value: AppContextType = useMemo(
     () => ({
       layout,
@@ -143,6 +185,8 @@ export function AppProvider({ children }: AppProviderProps) {
       removeStreamer,
       selectedStreams,
       updateSelectedStreams,
+      reorderSelectedStreams,
+      toggleStreamVisibility,
     }),
     [
       layout,
@@ -152,6 +196,8 @@ export function AppProvider({ children }: AppProviderProps) {
       removeStreamer,
       selectedStreams,
       updateSelectedStreams,
+      reorderSelectedStreams,
+      toggleStreamVisibility,
     ]
   );
 
