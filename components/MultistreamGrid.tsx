@@ -368,17 +368,24 @@ const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
 
   return (
     <>
-      {/* Контейнер театрального режима - без z-index, чтобы не создавать контекст стекирования */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none z-50">
+      {/* Фон театрального режима - ВРЕМЕННО ОТКЛЮЧЕН ДЛЯ ТЕСТИРОВАНИЯ */}
+      {/* <div
+        className="fixed top-0 bg-stale-600/70 h-screen w-screen pointer-events-auto"
+        style={{ zIndex: 40 }}
+        onClick={onClose}
+      /> */}
+
+      {/* Контейнер театрального режима - pointer-events разрешены для дочерних элементов */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
         {/* Контент театрального режима */}
-        <div className="relative flex items-center justify-center gap-2 w-full h-full max-w-[1920px] max-h-[1080px] z-50">
-          {/* Плеер - отдельное окно, z-index не нужен, iframe управляет своим z-index */}
+        <div className="relative flex items-center justify-center gap-2 w-full h-full max-w-[1920px] max-h-[1080px] pointer-events-none">
+          {/* Плеер - отдельное окно, БЕЗ z-index чтобы не создавать контекст стекирования */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="relative shrink-0 h-full rounded-lg overflow-hidden shadow-2xl pointer-events-auto z-50"
+            className="relative shrink-0 h-full rounded-lg shadow-2xl"
             style={{
               width: stream.chatUrl
                 ? "calc(70% - 0.5rem)"
@@ -387,9 +394,7 @@ const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
                 ? "calc(70% - 0.5rem)"
                 : "calc(100% - 2rem)",
               maxHeight: "calc(100vh - 1rem)",
-              zIndex: 50,
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <StreamPlayer
               streamId={stream.id}
@@ -434,10 +439,6 @@ const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
           </motion.button>
         </div>
       </div>
-      <div
-        className="fixed top-0 bg-stale-600/70 h-screen w-screen"
-        onClick={onClose}
-      />
     </>
   );
 };

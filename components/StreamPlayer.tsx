@@ -28,7 +28,8 @@ const getIframeContainer = () => {
       iframeContainer.style.left = "0";
       iframeContainer.style.width = "0";
       iframeContainer.style.height = "0";
-      iframeContainer.style.pointerEvents = "none";
+      iframeContainer.style.overflow = "visible";
+      iframeContainer.style.pointerEvents = "none"; // Контейнер не перехватывает события, iframe внутри управляют своими событиями
       // НЕ устанавливаем z-index для контейнера, чтобы не создавать контекст стекирования
       // Каждый iframe управляет своим z-index индивидуально
       document.body.appendChild(iframeContainer);
@@ -67,10 +68,11 @@ export const StreamPlayer = memo(function StreamPlayer({
       iframes.set(streamId, iframe);
     }
 
-    // Устанавливаем z-index для iframe в зависимости от режима
+    // Устанавливаем z-index и pointer-events для iframe в зависимости от режима
     // Каждый iframe управляет своим z-index индивидуально
+    iframe.style.pointerEvents = "auto"; // Всегда разрешаем события для iframe
     if (isTheatreMode) {
-      iframe.style.zIndex = "3"; // Выше фона (98), но ниже чата и кнопок
+      iframe.style.zIndex = "105"; // Выше фона, но ниже чата (106) и кнопок (107)
     } else {
       iframe.style.zIndex = "2"; // В сетке
     }
@@ -169,11 +171,12 @@ export const StreamPlayer = memo(function StreamPlayer({
   }, [streamId, url, isActive, isTheatreMode]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-lg translate-y-0">
+    <div className="relative w-full h-full rounded-lg translate-y-0">
       <div
         ref={anchorRef}
-        className="w-full h-full overflow-hidden rounded-lg"
+        className="w-full h-full rounded-lg"
         data-stream-id={streamId}
+        style={{ pointerEvents: "none" }}
       />
     </div>
   );
