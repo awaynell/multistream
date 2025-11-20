@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+    # Запускать деплой при любом коммите в main (включая merge commits, прямые коммиты и т.д.)
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    # Запускать деплой при слиянии pull request в main
+  workflow_dispatch:
+    # Позволяет запускать деплой вручную через интерфейс GitHub Actions
 
 jobs:
   deploy:
