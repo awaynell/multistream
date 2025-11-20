@@ -23,9 +23,26 @@ jobs:
           script: |
             set -e  # Останавливать выполнение при любой ошибке
 
+            # Явная загрузка nvm и добавление Node.js в PATH
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            # Явное добавление пути к Node.js в PATH (на случай если nvm не загрузился)
+            export PATH="$HOME/.nvm/versions/node/v24.9.0/bin:$PATH"
+
+            # Проверка доступности npm
+            if ! command -v npm &> /dev/null; then
+              echo "❌ npm не найден даже после загрузки nvm и добавления в PATH"
+              echo "PATH: $PATH"
+              exit 1
+            fi
+
+            echo "✓ Node.js версия: $(node -v)"
+            echo "✓ npm версия: $(npm -v)"
+
             PROJECT_DIR="/home/multistream"
             SCREEN_NAME="multistream"
-            PORT="${PORT:-3000}"  # Порт приложения для health check
+            PORT="${PORT:-3000}"
 
             echo "=== Начало деплоя ==="
 
@@ -86,7 +103,12 @@ jobs:
               fi
               
               # Запуск предыдущей версии
-              screen -dmS "$SCREEN_NAME" bash -c "cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log" || true
+              screen -dmS "$SCREEN_NAME" bash -c "
+                export NVM_DIR=\"\$HOME/.nvm\"
+                [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
+                export PATH=\"\$HOME/.nvm/versions/node/v24.9.0/bin:\$PATH\"
+                cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log
+              " || true
               sleep 3
               
               echo "❌ Деплой провален. Восстановлена предыдущая версия."
@@ -148,7 +170,12 @@ jobs:
 
             # Запуск приложения
             echo "🚀 Запуск приложения..."
-            screen -dmS "$SCREEN_NAME" bash -c "cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log"
+            screen -dmS "$SCREEN_NAME" bash -c "
+              export NVM_DIR=\"\$HOME/.nvm\"
+              [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
+              export PATH=\"\$HOME/.nvm/versions/node/v24.9.0/bin:\$PATH\"
+              cd $PROJECT_DIR && NODE_ENV=production npm run start 2>&1 | tee -a logs/app.log
+            "
 
             # Health check с ретраями
             echo "🔍 Проверка работоспособности приложения..."
@@ -165,7 +192,7 @@ jobs:
                 exit 1
               fi
               
-              # Проверка HTTP endpoint (если доступен)
+              # Проверка HTTP endpoint
               if command -v curl &> /dev/null; then
                 if curl -sf "http://localhost:$PORT" > /dev/null 2>&1; then
                   echo "✅ Приложение успешно запущено и отвечает на запросы"
@@ -208,16 +235,15 @@ jobs:
             echo "📍 Коммит: $NEW_COMMIT"
             echo "🖥️  Screen сессия: $SCREEN_NAME"
             echo "📊 Логи: $PROJECT_DIR/logs/app.log"
+            echo "🔧 Node.js: $(node -v)"
             echo "======================================"
 
       - name: Notify on success
         if: success()
         run: |
           echo "✅ Деплой выполнен успешно на $(date)"
-          # Здесь можно добавить отправку уведомлений (Telegram, Slack, Discord)
 
       - name: Notify on failure
         if: failure()
         run: |
           echo "❌ Деплой провален на $(date)"
-          # Здесь можно добавить отправку уведомлений об ошибке
