@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
+import { memo } from "react";
 import { motion } from "framer-motion";
 
 interface StreamChatProps {
@@ -8,20 +8,8 @@ interface StreamChatProps {
 }
 
 export const StreamChat = memo(function StreamChat({ url }: StreamChatProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setMounted(true);
-    }
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-base-200">
-        <span className="loading loading-spinner loading-md"></span>
-      </div>
-    );
+  if (typeof window === "undefined") {
+    return null;
   }
 
   return (

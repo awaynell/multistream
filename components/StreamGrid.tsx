@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { useApp } from "@/contexts/AppContext";
-import { MultistreamGrid, Stream } from "./MultistreamGrid";
-import { getTwitchEmbedUrl } from "@/utils/twitch";
+import { MultistreamGrid } from "./MultistreamGrid";
+import { getTwitchChatEmbedUrl, getTwitchPlayerEmbedUrl } from "@/utils/twitch";
+import { Stream } from "@/types";
 
 export function StreamGrid() {
   const {
@@ -27,6 +28,8 @@ export function StreamGrid() {
         return { cols: 2, rows: 2, gridSize: "2x2" as const };
       case "3x3":
         return { cols: 3, rows: 3, gridSize: "3x3" as const };
+      case "3x4":
+        return { cols: 3, rows: 4, gridSize: "3x4" as const };
       default:
         return { cols: 2, rows: 2, gridSize: "2x2" as const };
     }
@@ -51,24 +54,53 @@ export function StreamGrid() {
       .map((id) => getStreamerById(id))
       .filter((s): s is NonNullable<typeof s> => s !== undefined)
       .slice(0, gridConfig.cols * gridConfig.rows);
-  }, [selectedStreams, streamers, getStreamerById, gridConfig]);
+  }, [selectedStreams, getStreamerById, gridConfig]);
+
+  // Кеш для объектов Stream, чтобы переиспользовать их при неизменных данных
+  const streamCacheRef = useRef<Map<string, Stream>>(new Map());
 
   // Преобразуем Streamer[] в Stream[] для MultistreamGrid
+  // с кешированием объектов для предотвращения ререндеров
   const streams: Stream[] = useMemo(() => {
-    return displayStreamers.map((streamer) => {
-      const embedUrl = getTwitchEmbedUrl(streamer.username, hostname);
-      const chatUrl =
-        typeof window !== "undefined"
-          ? `https://www.twitch.tv/embed/${streamer.username}/chat?parent=${hostname}&darkpopout`
-          : undefined;
+    const cache = streamCacheRef.current;
+    const result: Stream[] = [];
 
-      return {
-        id: streamer.id,
-        url: embedUrl,
-        title: streamer.username,
-        chatUrl,
-      };
-    });
+    for (const streamer of displayStreamers) {
+      const embedUrl = getTwitchPlayerEmbedUrl(streamer.username, hostname);
+      const chatUrl = getTwitchChatEmbedUrl(streamer.username, hostname);
+
+      // Проверяем, есть ли кешированный объект с теми же данными
+      const cached = cache.get(streamer.id);
+      if (
+        cached &&
+        cached.url === embedUrl &&
+        cached.chatUrl === chatUrl &&
+        cached.title === streamer.username
+      ) {
+        // Данные не изменились, используем кешированный объект
+        result.push(cached);
+      } else {
+        // Данные изменились, создаём новый объект и кешируем его
+        const newStream: Stream = {
+          id: streamer.id,
+          url: embedUrl,
+          title: streamer.username,
+          chatUrl,
+        };
+        cache.set(streamer.id, newStream);
+        result.push(newStream);
+      }
+    }
+
+    // Очищаем кеш от объектов, которые больше не используются
+    const usedIds = new Set(displayStreamers.map((s) => s.id));
+    for (const [id] of cache) {
+      if (!usedIds.has(id)) {
+        cache.delete(id);
+      }
+    }
+
+    return result;
   }, [displayStreamers, hostname]);
 
   const handleRemoveStream = useCallback(

@@ -4,8 +4,9 @@ import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/contexts/AppContext";
-import { X, Eye, EyeOff, GripVertical } from "lucide-react";
+import { X, Eye, EyeOff, GripVertical, BadgeX } from "lucide-react";
 import { parseTwitchInput } from "@/utils/twitch";
+import { cn } from "@/utils/theme";
 
 interface FormData {
   username: string;
@@ -182,9 +183,9 @@ function StreamerManagerContent() {
                 return true;
               },
             })}
-            className={`input input-bordered w-full ${
-              errors.username ? "input-error" : ""
-            }`}
+            className={`${cn("input input-bordered w-full", {
+              "input-error": errors.username,
+            })}`}
             placeholder="Имя пользователя Twitch или URL"
             disabled={isSubmitting}
           />
@@ -202,7 +203,7 @@ function StreamerManagerContent() {
           disabled={isSubmitting}
         >
           {isSubmitting ? (
-            <span className="loading loading-spinner loading-sm"></span>
+            <span className="loading loading-spinner loading-sm" />
           ) : (
             "Добавить"
           )}
@@ -214,7 +215,7 @@ function StreamerManagerContent() {
           Добавленные стримеры ({streamers.length})
         </h4>
 
-        <div className="max-h-[400px] overflow-y-auto">
+        <div className="max-h-[400px] overflow-y-auto pt-2">
           <AnimatePresence>
             {orderedStreamers().map((streamer, index) => {
               const isVisible = selectedStreams.includes(streamer.id);
@@ -240,16 +241,20 @@ function StreamerManagerContent() {
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`card bg-base-200 p-3 mb-2 transition-all cursor-move ${
-                      isDragged ? "opacity-50 scale-95" : ""
-                    } ${isDragOver ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                    className={`${cn(
+                      "card p-3 bg-base-200 mb-2 transition-all cursor-move",
+                      {
+                        "opacity-75 scale-95": isDragged,
+                      },
+                      { "ring-4  ring-offset-[1] ring-primary": isDragOver }
+                    )}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <GripVertical className="h-4 w-4 text-base-content/40 shrink-0" />
                       <span
-                        className={`flex-1 text-base-content ${
-                          !isVisible ? "opacity-50 line-through" : ""
-                        }`}
+                        className={`${cn("flex-1 text-base-content", {
+                          "opacity-50 line-through": !isVisible,
+                        })}`}
                       >
                         {streamer.username}
                       </span>
@@ -262,17 +267,17 @@ function StreamerManagerContent() {
                         }
                       >
                         {isVisible ? (
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-5 w-5" />
                         ) : (
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-5 w-5" />
                         )}
                       </button>
                       <button
                         type="button"
-                        className="btn btn-circle btn-sm btn-error"
+                        className="btn btn-circle btn-sm hover:scale-110 transition-all duration-200"
                         onClick={() => removeStreamer(streamer.id)}
                       >
-                        <X className="h-4 w-4" />
+                        <BadgeX className="h-5 w-5" />
                       </button>
                     </div>
                   </div>

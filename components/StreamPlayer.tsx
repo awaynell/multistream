@@ -1,4 +1,3 @@
-// StreamPlayer.tsx - обновленная версия
 "use client";
 
 import { useEffect, useRef, memo } from "react";

@@ -1,21 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
-import { StreamPlayer } from "./StreamPlayer";
-import { StreamChat } from "./StreamChat";
-
-export type Stream = {
-  id: string;
-  url: string;
-  title: string;
-  chatUrl?: string;
-};
+import { AnimatePresence } from "framer-motion";
+import { LayoutPreset, Stream } from "@/types";
+import { RemoveConfirmModal } from "./organisms/RemoveConfirmModal";
+import { TheatreModeView } from "./organisms/TheatreModeView";
+import { StreamTile } from "./moleculas/StreamTile";
 
 interface MultistreamGridProps {
   streams: Stream[];
-  gridSize?: "1x1" | "2x2" | "3x3";
+  gridSize?: LayoutPreset;
   className?: string;
   onRemoveStream?: (streamId: string) => void;
   onReorderStreams?: (fromIndex: number, toIndex: number) => void;
@@ -33,7 +27,6 @@ export function MultistreamGrid({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Обработка Escape для закрытия театрального режима
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && theatreMode) {
@@ -50,8 +43,12 @@ export function MultistreamGrid({
       return { cols: 1, rows: 1 };
     } else if (gridSize === "2x2") {
       return { cols: 2, rows: 2 };
-    } else {
+    } else if (gridSize === "3x3") {
       return { cols: 3, rows: 3 };
+    } else if (gridSize === "3x4") {
+      return { cols: 3, rows: 4 };
+    } else {
+      return { cols: 2, rows: 2 };
     }
   }, [gridSize]);
 
@@ -103,12 +100,23 @@ export function MultistreamGrid({
     setDragOverIndex(null);
   }, []);
 
+  // Мемоизируем selectedStream, создавая стабильную ссылку на объект
+  // Используем предыдущее значение из замыкания для сравнения
   const selectedStream = useMemo(() => {
-    return theatreMode ? streams.find((s) => s.id === theatreMode) : null;
+    if (!theatreMode) return null;
+
+    const found = streams.find((s) => s.id === theatreMode);
+    if (!found) return null;
+
+    return found;
   }, [theatreMode, streams]);
 
   const handleTheatreToggle = useCallback((streamId: string) => {
     setTheatreMode((prev) => (prev === streamId ? null : streamId));
+  }, []);
+
+  const handleTheatreClose = useCallback(() => {
+    setTheatreMode(null);
   }, []);
 
   const removeModalCheckboxRef = useRef<HTMLInputElement>(null);
@@ -227,7 +235,7 @@ export function MultistreamGrid({
           <TheatreModeView
             key={`theatre-${selectedStream.id}`}
             stream={selectedStream}
-            onClose={() => setTheatreMode(null)}
+            onClose={handleTheatreClose}
           />
         )}
       </AnimatePresence>
@@ -246,332 +254,3 @@ export function MultistreamGrid({
     </>
   );
 }
-
-interface StreamTileProps {
-  stream: Stream;
-  isTheatreMode: boolean;
-  isAnyTheatreModeActive: boolean;
-  onTheatreModeToggle: () => void;
-  onRemove?: () => void;
-  isDragged?: boolean;
-  isDragOver?: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-}
-
-const StreamTile = ({
-  stream,
-  isTheatreMode,
-  isAnyTheatreModeActive,
-  onTheatreModeToggle,
-  onRemove,
-  isDragged = false,
-  isDragOver = false,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
-}: StreamTileProps) => {
-  // Критически важно: НЕ удаляем плитку из DOM в театральном режиме
-  // Это гарантирует, что iframe останется в DOM и не перезагрузится
-
-  // Применяем блюр только к элементам, которые НЕ в театральном режиме,
-  // когда какой-то другой элемент в театральном режиме
-  const shouldBlur = isAnyTheatreModeActive && !isTheatreMode;
-
-  return (
-    <div
-      draggable={!isTheatreMode}
-      onDragStart={(e) => {
-        if (!isTheatreMode) {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", stream.id);
-          onDragStart();
-        }
-      }}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-      className={`relative min-h-[200px] h-full w-full rounded-lg overflow-hidden bg-base-200 group transition-all duration-200 ${
-        isTheatreMode
-          ? "pointer-events-none opacity-0"
-          : "opacity-100 cursor-move"
-      } ${isDragged ? "opacity-50 scale-95" : ""} ${
-        isDragOver ? "ring-2 ring-primary ring-offset-2 scale-105" : ""
-      } ${shouldBlur ? "blur-md" : ""}`}
-    >
-      <StreamPlayer
-        streamId={stream.id}
-        url={stream.url}
-        isActive={!isTheatreMode}
-        isTheatreMode={false}
-      />
-      {/* Кнопки управления - появляются при наведении на тайл */}
-      {!isTheatreMode && (
-        <div
-          className="absolute top-2 right-2 flex gap-2"
-          style={{ zIndex: 20 }}
-        >
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onTheatreModeToggle();
-            }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-sm btn-primary shadow-lg"
-            aria-label="Открыть театральный режим"
-            title="Театральный режим"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-            </svg>
-            <span className="hidden sm:inline ml-1">Театр</span>
-          </button>
-          {onRemove && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onRemove();
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-sm btn-error shadow-lg"
-              aria-label="Удалить стрим"
-              title="Удалить стрим"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-interface TheatreModeViewProps {
-  stream: Stream;
-  onClose: () => void;
-}
-
-const TheatreModeView = ({ stream, onClose }: TheatreModeViewProps) => {
-  const playerRef = useRef<HTMLDivElement>(null);
-  const [maskStyle, setMaskStyle] = useState<React.CSSProperties>({});
-
-  // Блокируем скролл body при открытии театрального режима
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
-  // Вычисляем позицию и размеры плеера для маски
-  useEffect(() => {
-    const updateMask = () => {
-      if (!playerRef.current) return;
-
-      const rect = playerRef.current.getBoundingClientRect();
-
-      // Вычисляем позицию относительно viewport (так как overlay fixed)
-      const left = rect.left;
-      const top = rect.top;
-      const width = rect.width;
-      const height = rect.height;
-
-      // Создаем маску с вырезом для плеера используя clip-path
-      // Покрываем всё кроме области плеера
-      const clipPath = `polygon(
-        0% 0%, 
-        0% 100%, 
-        ${left}px 100%, 
-        ${left}px ${top}px, 
-        ${left + width}px ${top}px, 
-        ${left + width}px ${top + height}px, 
-        ${left}px ${top + height}px, 
-        ${left}px 100%, 
-        100% 100%, 
-        100% 0%
-      )`;
-
-      setMaskStyle({
-        clipPath,
-      });
-    };
-
-    updateMask();
-    const interval = setInterval(updateMask, 100); // Обновляем каждые 100мс для плавности
-    window.addEventListener("resize", updateMask);
-    window.addEventListener("scroll", updateMask);
-
-    // Обновляем маску с небольшой задержкой для анимации
-    const timeout = setTimeout(updateMask, 100);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("resize", updateMask);
-      window.removeEventListener("scroll", updateMask);
-      clearTimeout(timeout);
-    };
-  }, [stream.chatUrl]);
-
-  return (
-    <>
-      {/* Overlay с блюром для сетки, исключающий область плеера */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
-        className="fixed inset-0 backdrop-blur-md bg-base-300/20 pointer-events-none"
-        style={{
-          zIndex: 50,
-          ...maskStyle,
-        }}
-      />
-
-      {/* Контейнер театрального режима - pointer-events разрешены для дочерних элементов */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-        {/* Контент театрального режима */}
-        <div className="relative flex items-center justify-center gap-2 w-full h-full max-w-[1920px] max-h-[1080px] pointer-events-none">
-          {/* Плеер - отдельное окно, БЕЗ z-index чтобы не создавать контекст стекирования */}
-          <motion.div
-            ref={playerRef}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="relative shrink-0 h-full rounded-lg shadow-2xl"
-            style={{
-              width: stream.chatUrl
-                ? "calc(70% - 0.5rem)"
-                : "calc(100% - 2rem)",
-              maxWidth: stream.chatUrl
-                ? "calc(70% - 0.5rem)"
-                : "calc(100% - 2rem)",
-              maxHeight: "calc(100vh - 1rem)",
-            }}
-          >
-            <StreamPlayer
-              streamId={stream.id}
-              url={stream.url}
-              isActive={true}
-              isTheatreMode={true}
-            />
-          </motion.div>
-
-          {/* Чат - отдельное окно */}
-          {stream.chatUrl && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="relative shrink-0 h-full bg-base-100 rounded-lg shadow-2xl overflow-hidden pointer-events-auto"
-              style={{
-                width: "calc(30% - 0.5rem)",
-                maxWidth: "calc(30% - 0.5rem)",
-                maxHeight: "calc(100vh - 1rem)",
-                zIndex: 106, // Чат поверх фона
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <StreamChat url={stream.chatUrl} />
-            </motion.div>
-          )}
-
-          {/* Кнопка закрытия - поверх всего */}
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2, delay: 0.1 }}
-            onClick={onClose}
-            className="absolute right-4 top-4 btn btn-circle btn-sm btn-error pointer-events-auto"
-            style={{ zIndex: 107 }}
-            aria-label="Закрыть театральный режим"
-          >
-            <X className="h-5 w-5" />
-          </motion.button>
-        </div>
-      </div>
-    </>
-  );
-};
-
-interface RemoveConfirmModalProps {
-  streamTitle: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  checkboxRef: React.RefObject<HTMLInputElement | null>;
-}
-
-const RemoveConfirmModal = ({
-  streamTitle,
-  onConfirm,
-  onCancel,
-  checkboxRef,
-}: RemoveConfirmModalProps) => {
-  // Не рендерим модалку, если нет названия стрима
-  if (!streamTitle) {
-    return null;
-  }
-
-  return (
-    <>
-      <input
-        type="checkbox"
-        id="remove-stream-modal"
-        className="modal-toggle"
-        ref={checkboxRef}
-      />
-      <div className="modal" role="dialog">
-        <div className="modal-box max-w-md">
-          <h3 className="text-2xl font-bold text-base-content mb-4">
-            Подтверждение удаления
-          </h3>
-          <p className="text-base-content mb-6">
-            Вы уверены, что хотите удалить стрим <strong>{streamTitle}</strong>{" "}
-            из сетки?
-          </p>
-          <div className="modal-action">
-            <label
-              htmlFor="remove-stream-modal"
-              className="btn btn-outline"
-              onClick={onCancel}
-            >
-              Отмена
-            </label>
-            <label
-              htmlFor="remove-stream-modal"
-              className="btn btn-error"
-              onClick={onConfirm}
-            >
-              Удалить
-            </label>
-          </div>
-        </div>
-        <label
-          className="modal-backdrop"
-          htmlFor="remove-stream-modal"
-          onClick={onCancel}
-        >
-          Закрыть
-        </label>
-      </div>
-    </>
-  );
-};

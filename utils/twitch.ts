@@ -4,29 +4,29 @@
  * @returns username или null если невалидный формат
  */
 export function parseTwitchInput(input: string): string | null {
-  if (!input || typeof input !== 'string') {
-    return null
+  if (!input || typeof input !== "string") {
+    return null;
   }
 
-  const trimmed = input.trim()
+  const trimmed = input.trim();
 
   // Если это URL
-  if (trimmed.includes('twitch.tv/')) {
-    const urlPattern = /(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]+)/i
-    const match = trimmed.match(urlPattern)
+  if (trimmed.includes("twitch.tv/")) {
+    const urlPattern = /(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]+)/i;
+    const match = trimmed.match(urlPattern);
     if (match && match[1]) {
-      return match[1].toLowerCase()
+      return match[1].toLowerCase();
     }
-    return null
+    return null;
   }
 
   // Если это просто username (только буквы, цифры, подчеркивания)
-  const usernamePattern = /^[a-zA-Z0-9_]{1,25}$/
+  const usernamePattern = /^[a-zA-Z0-9_]{1,25}$/;
   if (usernamePattern.test(trimmed)) {
-    return trimmed.toLowerCase()
+    return trimmed.toLowerCase();
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -35,16 +35,25 @@ export function parseTwitchInput(input: string): string | null {
  * @param parent - домен родительской страницы (для безопасности)
  * @returns URL для iframe
  */
-export function getTwitchEmbedUrl(username: string, parent?: string): string {
+export function getTwitchPlayerEmbedUrl(
+  username: string,
+  parent?: string
+): string {
   // Если parent не передан, используем значение по умолчанию
   // Вызывающий код должен передавать parent из useEffect
-  const parentDomain = parent || 'localhost'
+  const parentDomain = parent || "localhost";
   const params = new URLSearchParams({
     channel: username,
     parent: parentDomain,
-    autoplay: 'true',
-    muted: 'false',
-  })
-  return `https://player.twitch.tv/?${params.toString()}`
+    autoplay: "true",
+    muted: "false",
+  });
+  return `https://player.twitch.tv/?${params.toString()}`;
 }
 
+export function getTwitchChatEmbedUrl(
+  username: string,
+  hostname: string
+): string {
+  return `https://www.twitch.tv/embed/${username}/chat?parent=${hostname}&darkpopout`;
+}

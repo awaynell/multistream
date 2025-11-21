@@ -2,12 +2,14 @@
 
 import { useApp } from "@/contexts/AppContext";
 import { LayoutPreset } from "@/types";
+import { cn } from "@/utils/theme";
 import { motion } from "framer-motion";
 
 const PRESETS: { value: LayoutPreset; label: string }[] = [
   { value: "1x1", label: "1x1" },
   { value: "2x2", label: "2x2" },
   { value: "3x3", label: "3x3" },
+  { value: "3x4", label: "3x4" },
 ];
 
 // Общий компонент для выбора лейаута
@@ -19,12 +21,9 @@ function LayoutSelectorContent() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pt-4 pb-4">
       <div className="flex flex-col gap-3">
-        <h4 className="text-lg font-semibold text-base-content">
-          Предустановленные лейауты
-        </h4>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 grid-rows-2">
           {PRESETS.map((preset) => {
             const isSelected =
               layout.type === "preset" && layout.preset === preset.value;
@@ -36,9 +35,10 @@ function LayoutSelectorContent() {
                 whileTap={{ scale: 0.95 }}
               >
                 <button
-                  className={`btn min-w-[80px] ${
-                    isSelected ? "btn-primary" : "btn-outline"
-                  }`}
+                  className={`${cn("btn w-full", {
+                    "btn-primary": isSelected,
+                    "btn-outline": !isSelected,
+                  })}`}
                   onClick={() => handlePresetSelect(preset.value)}
                 >
                   {preset.label}
@@ -47,12 +47,6 @@ function LayoutSelectorContent() {
             );
           })}
         </div>
-      </div>
-
-      <div className="card bg-base-200 p-3">
-        <p className="text-sm text-base-content">
-          Текущий лейаут: {layout.preset}
-        </p>
       </div>
     </div>
   );
@@ -74,7 +68,7 @@ export function LayoutSelectorModal() {
     <>
       <input type="checkbox" id="layout-modal" className="modal-toggle" />
       <div className="modal" role="dialog">
-        <div className="modal-box max-w-2xl">
+        <div className="modal-box max-w-xl">
           <h3 className="text-2xl font-bold text-base-content mb-4">
             Выбор лейаута
           </h3>
@@ -82,7 +76,7 @@ export function LayoutSelectorModal() {
             <LayoutSelectorContent />
           </div>
           <div className="modal-action">
-            <label htmlFor="layout-modal" className="btn">
+            <label htmlFor="layout-modal" className="btn bg-primary">
               Закрыть
             </label>
           </div>
