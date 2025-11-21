@@ -17,7 +17,6 @@ const TheatreModeViewComponent = ({
   stream,
   onClose,
 }: TheatreModeViewProps) => {
-  console.log("stream", stream);
   const playerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [maskStyle, setMaskStyle] = useState<React.CSSProperties>({});
@@ -292,7 +291,7 @@ const TheatreModeViewComponent = ({
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2, delay: 0.1 }}
             onClick={onClose}
-            className="absolute right-2 top-2 btn btn-circle btn-md pointer-events-auto hover:scale-110 transition-all duration-200"
+            className="absolute btn-alert right-2 top-2 btn btn-circle btn-sm pointer-events-auto hover:scale-125 transition-all duration-200"
             style={{ zIndex: 107 }}
             aria-label="Закрыть театральный режим"
           >

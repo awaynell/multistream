@@ -54,7 +54,7 @@ export const StreamTile = ({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        "relative min-h-[200px] h-full w-full rounded-lg overflow-hidden bg-base-200 group transition-all duration-200",
+        "relative h-full w-full rounded-lg overflow-hidden bg-base-200 group transition-all duration-200",
         isTheatreMode
           ? "pointer-events-none opacity-0"
           : "opacity-100 cursor-move",
@@ -81,7 +81,7 @@ export const StreamTile = ({
               e.stopPropagation();
               onTheatreModeToggle();
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-sm btn-primary shadow-lg"
+            className="opacity-0 group-hover:opacity-100 btn btn-sm btn-primary btn-circle shadow-lg hover:scale-125 transition-all duration-200"
             aria-label="Открыть театральный режим"
             title="Театральный режим"
           >
@@ -106,7 +106,7 @@ export const StreamTile = ({
                 e.stopPropagation();
                 onRemove();
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 btn btn-sm btn-error shadow-lg text-white"
+              className="opacity-0 group-hover:opacity-100 btn btn-sm btn-circle btn-error shadow-lg text-white hover:scale-125 transition-all duration-200"
               aria-label="Удалить стрим"
               title="Удалить стрим"
             >

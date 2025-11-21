@@ -9,13 +9,17 @@ import {
   useMemo,
   ReactNode,
 } from "react";
-import { Layout, LayoutPreset, Streamer } from "@/types";
+import { ELayoutPreset, Layout, Streamer, Theme } from "@/types";
 import { parseTwitchInput } from "@/utils/twitch";
 
 interface AppContextType {
   // Layout
   layout: Layout;
-  setPresetLayout: (preset: LayoutPreset) => void;
+  setPresetLayout: (preset: ELayoutPreset) => void;
+
+  // Theme
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
 
   // Streamers
   streamers: Streamer[];
@@ -33,7 +37,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const defaultLayout: Layout = {
   type: "preset",
-  preset: "2x2",
+  preset: ELayoutPreset["2x2"],
 };
 
 interface AppProviderProps {
@@ -42,6 +46,7 @@ interface AppProviderProps {
 
 export function AppProvider({ children }: AppProviderProps) {
   const [layout, setLayout] = useState<Layout>(defaultLayout);
+  const [theme, setThemeState] = useState<Theme>("dark");
   const [streamers, setStreamers] = useState<Streamer[]>([]);
   const [selectedStreams, setSelectedStreams] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -50,6 +55,7 @@ export function AppProvider({ children }: AppProviderProps) {
   useEffect(() => {
     try {
       const savedLayout = localStorage.getItem("multistream_layout");
+      const savedTheme = localStorage.getItem("multistream_theme");
       const savedStreamers = localStorage.getItem("multistream_streamers");
       const savedSelected = localStorage.getItem(
         "multistream_selected_streams"
@@ -58,6 +64,9 @@ export function AppProvider({ children }: AppProviderProps) {
       if (savedLayout) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setLayout(JSON.parse(savedLayout));
+      }
+      if (savedTheme) {
+        setThemeState(savedTheme as Theme);
       }
       if (savedStreamers) {
         const parsedStreamers = JSON.parse(savedStreamers);
@@ -87,6 +96,17 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   }, [layout, isInitialized]);
 
+  // Синхронизация theme с localStorage и применением к документу
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem("multistream_theme", theme);
+      // Применяем тему к html элементу
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("data-theme", theme);
+      }
+    }
+  }, [theme, isInitialized]);
+
   // Синхронизация streamers с localStorage
   useEffect(() => {
     if (isInitialized) {
@@ -104,11 +124,15 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   }, [selectedStreams, isInitialized]);
 
-  const setPresetLayout = useCallback((preset: LayoutPreset) => {
+  const setPresetLayout = useCallback((preset: ELayoutPreset) => {
     setLayout({
       type: "preset",
       preset,
     });
+  }, []);
+
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme);
   }, []);
 
   const addStreamer = useCallback((input: string) => {
@@ -180,6 +204,8 @@ export function AppProvider({ children }: AppProviderProps) {
     () => ({
       layout,
       setPresetLayout,
+      theme,
+      setTheme,
       streamers,
       addStreamer,
       removeStreamer,
@@ -191,6 +217,8 @@ export function AppProvider({ children }: AppProviderProps) {
     [
       layout,
       setPresetLayout,
+      theme,
+      setTheme,
       streamers,
       addStreamer,
       removeStreamer,

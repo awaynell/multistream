@@ -1,36 +1,18 @@
 "use client";
 
-import { StreamGrid } from "@/components/StreamGrid";
+import { MultistreamGrid } from "@/components/MultistreamGrid";
 import { StreamerManagerModal } from "@/components/StreamerManager";
-import { LayoutSelectorModal } from "@/components/LayoutSelector";
-import { AppProvider } from "@/contexts/AppContext";
+import { LayoutSelectorModal } from "@/components/organisms/LayoutSelector";
 
 export default function Home() {
   return (
-    <AppProvider>
-      <div className="flex h-screen flex-col bg-base-100">
-        {/* Компактный header */}
-        <header className="flex items-center justify-between border-b border-base-300 bg-base-100 px-4 py-2">
-          <h1 className="text-xl font-bold text-base-content">Multistream</h1>
-          <div className="flex gap-2">
-            <label htmlFor="streamer-modal" className="btn btn-sm btn-primary">
-              Стримеры
-            </label>
-            <label htmlFor="layout-modal" className="btn btn-sm btn-outline">
-              Лейаут
-            </label>
-          </div>
-        </header>
+    <div className="flex flex-col bg-base-100">
+      {/* Основной контент - сетка стримов */}
+      <MultistreamGrid />
 
-        {/* Основной контент - сетка стримов */}
-        <div className="flex-1">
-          <StreamGrid />
-        </div>
-
-        {/* Модальные окна */}
-        <StreamerManagerModal />
-        <LayoutSelectorModal />
-      </div>
-    </AppProvider>
+      {/* Модальные окна */}
+      <StreamerManagerModal />
+      <LayoutSelectorModal />
+    </div>
   );
 }

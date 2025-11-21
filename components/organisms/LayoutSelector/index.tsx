@@ -1,22 +1,22 @@
 "use client";
 
 import { useApp } from "@/contexts/AppContext";
-import { LayoutPreset } from "@/types";
+import { ELayoutPreset } from "@/types";
 import { cn } from "@/utils/theme";
 import { motion } from "framer-motion";
 
-const PRESETS: { value: LayoutPreset; label: string }[] = [
-  { value: "1x1", label: "1x1" },
-  { value: "2x2", label: "2x2" },
-  { value: "3x3", label: "3x3" },
-  { value: "3x4", label: "3x4" },
+const PRESETS: { value: ELayoutPreset; label: string }[] = [
+  { value: ELayoutPreset["1x1"], label: "1x1" },
+  { value: ELayoutPreset["2x2"], label: "2x2" },
+  { value: ELayoutPreset["3x3"], label: "3x3" },
+  { value: ELayoutPreset["3x4"], label: "3x4" },
 ];
 
 // Общий компонент для выбора лейаута
 function LayoutSelectorContent() {
   const { layout, setPresetLayout } = useApp();
 
-  const handlePresetSelect = (preset: LayoutPreset) => {
+  const handlePresetSelect = (preset: ELayoutPreset) => {
     setPresetLayout(preset);
   };
 
@@ -76,7 +76,7 @@ export function LayoutSelectorModal() {
             <LayoutSelectorContent />
           </div>
           <div className="modal-action">
-            <label htmlFor="layout-modal" className="btn bg-primary">
+            <label htmlFor="layout-modal" className="btn btn-primary">
               Закрыть
             </label>
           </div>
