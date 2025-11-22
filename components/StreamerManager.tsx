@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/contexts/AppContext";
-import { X, Eye, EyeOff, GripVertical, BadgeX } from "lucide-react";
+import { Eye, EyeOff, GripVertical, BadgeX } from "lucide-react";
 import { parseTwitchInput } from "@/utils/twitch";
 import { cn } from "@/utils/theme";
 
@@ -25,6 +25,10 @@ function StreamerManagerContent() {
   } = useApp();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -36,6 +40,53 @@ function StreamerManagerContent() {
       username: "",
     },
   });
+
+  // Функция автоскролла
+  const handleAutoScroll = useCallback((e: React.DragEvent) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouseY = e.clientY;
+    const threshold = 150; // Зона для автоскролла (px от края)
+    const scrollSpeed = 12; // Скорость скролла
+
+    // Очищаем предыдущий интервал
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
+    // Скролл вверх
+    if (mouseY - rect.top < threshold) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        container.scrollTop = Math.max(0, container.scrollTop - scrollSpeed);
+      }, 20); // ~60fps
+    }
+    // Скролл вниз
+    else if (rect.bottom - mouseY < threshold) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        container.scrollTop = Math.min(
+          maxScroll,
+          container.scrollTop + scrollSpeed
+        );
+      }, 20);
+    }
+  }, []);
+
+  // Останавливаем автоскролл
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+  }, []);
+
+  // Очистка при размонтировании
+  useEffect(() => {
+    return () => stopAutoScroll();
+  }, [stopAutoScroll]);
 
   const onSubmit = async (data: FormData) => {
     const trimmedValue = data.username.trim();
@@ -105,21 +156,28 @@ function StreamerManagerContent() {
     (e: React.DragEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
+
+      // Запускаем автоскролл
+      handleAutoScroll(e);
+
       if (draggedIndex !== null && draggedIndex !== index) {
         setDragOverIndex(index);
       }
     },
-    [draggedIndex]
+    [draggedIndex, handleAutoScroll]
   );
 
   const handleDragLeave = useCallback(() => {
     setDragOverIndex(null);
-  }, []);
+    stopAutoScroll();
+  }, [stopAutoScroll]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent, dropIndex: number) => {
       e.preventDefault();
       e.stopPropagation();
+
+      stopAutoScroll();
 
       if (draggedIndex !== null && draggedIndex !== dropIndex) {
         const ordered = orderedStreamers();
@@ -159,13 +217,15 @@ function StreamerManagerContent() {
       selectedStreams,
       reorderSelectedStreams,
       updateSelectedStreams,
+      stopAutoScroll,
     ]
   );
 
   const handleDragEnd = useCallback(() => {
     setDraggedIndex(null);
     setDragOverIndex(null);
-  }, []);
+    stopAutoScroll();
+  }, [stopAutoScroll]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -215,7 +275,10 @@ function StreamerManagerContent() {
           Добавленные стримеры ({streamers.length})
         </h4>
 
-        <div className="max-h-[400px] overflow-y-auto pt-2">
+        <div
+          className="max-h-[400px] overflow-y-auto pt-2"
+          ref={scrollContainerRef}
+        >
           <AnimatePresence>
             {orderedStreamers().map((streamer, index) => {
               const isVisible = selectedStreams.includes(streamer.id);

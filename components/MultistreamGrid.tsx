@@ -16,18 +16,10 @@ interface MultistreamGridProps {
 }
 
 export function MultistreamGrid({ className = "" }: MultistreamGridProps) {
-  const {
-    layout,
-    selectedStreams,
-    streamers,
-    removeStreamer,
-    reorderSelectedStreams,
-  } = useApp();
+  const { layout, selectedStreams, streamers, removeStreamer } = useApp();
 
   const [theatreMode, setTheatreMode] = useState<string | null>(null);
   const [streamToRemove, setStreamToRemove] = useState<string | null>(null);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Получаем hostname для Twitch embed
   const hostname =
@@ -112,52 +104,6 @@ export function MultistreamGrid({ className = "" }: MultistreamGridProps) {
     [removeStreamer]
   );
 
-  const onReorderStreams = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      reorderSelectedStreams(fromIndex, toIndex);
-    },
-    [reorderSelectedStreams]
-  );
-
-  const handleDragStart = useCallback((index: number) => {
-    setDraggedIndex(index);
-  }, []);
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent, index: number) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (draggedIndex !== null && draggedIndex !== index) {
-        setDragOverIndex(index);
-      }
-    },
-    [draggedIndex]
-  );
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverIndex(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent, dropIndex: number) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (draggedIndex !== null && draggedIndex !== dropIndex) {
-        onReorderStreams(draggedIndex, dropIndex);
-      }
-
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-    },
-    [draggedIndex, onReorderStreams]
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  }, []);
-
   // Мемоизируем selectedStream, создавая стабильную ссылку на объект
   // Используем предыдущее значение из замыкания для сравнения
   const selectedStream = useMemo(() => {
@@ -216,17 +162,50 @@ export function MultistreamGrid({ className = "" }: MultistreamGridProps) {
     }
   }, []);
 
-  // if (displayStreams.length === 0) {
-  //   return (
-  //     <div
-  //       className={`flex flex-1 items-center justify-center p-8 ${className}`}
-  //     >
-  //       <p className="text-center text-xl text-base-content/60">
-  //         Добавьте стримы, чтобы начать просмотр
-  //       </p>
-  //     </div>
-  //   );
-  // }
+  const renderStreams = useCallback(() => {
+    return Array.from({ length: gridConfig.cols * gridConfig.rows }).map(
+      (_, index) => {
+        const stream = displayStreams[index];
+
+        if (!stream) {
+          return (
+            <label
+              htmlFor="streamer-modal"
+              key={`empty-${index}`}
+              className={`${cn(
+                "group relative flex items-center justify-center rounded-lg bg-base-300 transition-all w-full h-full min-h-[200px] cursor-pointer hover:bg-base-300/80"
+              )}`}
+            >
+              <p className="absolute text-base-content/60 transition-opacity duration-200 group-hover:opacity-0">
+                Пусто
+              </p>
+              <p className="absolute text-primary transition-opacity duration-200 opacity-0 group-hover:opacity-100">
+                Добавить стримера
+              </p>
+            </label>
+          );
+        }
+
+        return (
+          <StreamTile
+            key={stream.id}
+            stream={stream}
+            isTheatreMode={theatreMode === stream.id}
+            isAnyTheatreModeActive={!!theatreMode}
+            onTheatreModeToggle={() => handleTheatreToggle(stream.id)}
+            onRemove={() => handleRemoveClick(stream.id)}
+          />
+        );
+      }
+    );
+  }, [
+    displayStreams,
+    theatreMode,
+    gridConfig.cols,
+    gridConfig.rows,
+    handleTheatreToggle,
+    handleRemoveClick,
+  ]);
 
   return (
     <>
@@ -256,58 +235,7 @@ export function MultistreamGrid({ className = "" }: MultistreamGridProps) {
             gridTemplateRows: `repeat(${gridConfig.rows}, 1fr)`,
           }}
         >
-          {Array.from({ length: gridConfig.cols * gridConfig.rows }).map(
-            (_, index) => {
-              const stream = displayStreams[index];
-              const isDragged = draggedIndex === index;
-              const isDragOver = dragOverIndex === index;
-
-              if (!stream) {
-                return (
-                  <label
-                    htmlFor="streamer-modal"
-                    key={`empty-${index}`}
-                    className={`${cn(
-                      "group relative flex items-center justify-center rounded-lg bg-base-300 transition-all w-full h-full min-h-[200px] cursor-pointer hover:bg-base-300/80",
-                      {
-                        "ring-2 ring-primary ring-offset-2": isDragOver,
-                      }
-                    )}`}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, index)}
-                  >
-                    <p className="absolute text-base-content/60 transition-opacity duration-200 group-hover:opacity-0">
-                      Пусто
-                    </p>
-                    <p className="absolute text-primary transition-opacity duration-200 opacity-0 group-hover:opacity-100">
-                      Добавить стримера
-                    </p>
-                  </label>
-                );
-              }
-
-              // Всегда рендерим StreamTile, даже в театральном режиме
-              // чтобы iframe не размонтировался
-              return (
-                <StreamTile
-                  key={stream.id}
-                  stream={stream}
-                  isTheatreMode={theatreMode === stream.id}
-                  isAnyTheatreModeActive={!!theatreMode}
-                  onTheatreModeToggle={() => handleTheatreToggle(stream.id)}
-                  onRemove={() => handleRemoveClick(stream.id)}
-                  isDragged={isDragged}
-                  isDragOver={isDragOver}
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
-                />
-              );
-            }
-          )}
+          {renderStreams()}
         </div>
       </div>
 

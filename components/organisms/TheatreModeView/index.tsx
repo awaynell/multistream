@@ -1,4 +1,4 @@
-import { StreamChat } from "@/components/StreamChat";
+import { StreamChat } from "@/components/moleculas/StreamChat";
 import { StreamPlayer } from "@/components/StreamPlayer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useTheaterWidth } from "@/hooks/useTheaterWidth";
@@ -21,6 +21,7 @@ const TheatreModeViewComponent = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [maskStyle, setMaskStyle] = useState<React.CSSProperties>({});
   const [isDragging, setIsDragging] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const { playerWidthRatio, chatWidthRatio, setPlayerWidthRatio } =
     useTheaterWidth();
@@ -32,6 +33,14 @@ const TheatreModeViewComponent = ({
   // Блокируем скролл body при открытии театрального режима
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    // Используем requestAnimationFrame для плавного перехода размеров
+    // Это позволяет браузеру сначала отрендерить элемент с начальными размерами,
+    // а затем применить transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsInitialized(true);
+      });
+    });
     return () => {
       document.body.style.overflow = "";
     };
@@ -195,11 +204,11 @@ const TheatreModeViewComponent = ({
 
       {/* Overlay с блюром для сетки, исключающий область плеера */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
-        className="fixed inset-0 backdrop-blur-md bg-base-300/20 pointer-events-none"
+        initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+        animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+        exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        className="fixed inset-0 bg-base-300/10 pointer-events-none"
         style={{
           zIndex: 50,
           ...maskStyle,
@@ -216,22 +225,32 @@ const TheatreModeViewComponent = ({
           {/* Плеер - отдельное окно, БЕЗ z-index чтобы не создавать контекст стекирования */}
           <motion.div
             ref={playerRef}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{
+              duration: 0.5,
+              ease: [0.16, 1, 0.3, 1],
+              opacity: { duration: 0.4 },
+              scale: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+              y: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+            }}
             className={cn(
-              "relative shrink-0 h-full rounded-lg shadow-2xl transition-opacity pointer-events-auto",
+              "relative shrink-0 h-full shadow-2xl pointer-events-auto",
               { "pointer-events-none": isDragging }
             )}
             style={{
               width: stream.chatUrl
-                ? `calc(${playerWidthRatio * 100}% - 0.5rem)`
+                ? `calc(${playerWidthRatio * 100}%)`
                 : "calc(100% - 2rem)",
               maxWidth: stream.chatUrl
-                ? `calc(${playerWidthRatio * 100}% - 0.5rem)`
+                ? `calc(${playerWidthRatio * 100}%)`
                 : "calc(100% - 2rem)",
-              maxHeight: "calc(100vh - 1rem)",
+              maxHeight: "100vh",
+              transition: isInitialized
+                ? "width 0.5s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
+                : "none",
+              willChange: "width, max-width",
             }}
           >
             <StreamPlayer
@@ -244,13 +263,33 @@ const TheatreModeViewComponent = ({
 
           {/* Разделитель для изменения ширины */}
           {stream.chatUrl && (
-            <div
+            <motion.div
+              key="resizer"
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              variants={{
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    duration: 0.4,
+                    delay: 0.2,
+                    ease: [0.16, 1, 0.3, 1],
+                  },
+                },
+                hidden: {
+                  opacity: 0,
+                  transition: {
+                    duration: 0, // Мгновенное исчезновение при выходе
+                  },
+                },
+              }}
               onMouseDown={handleMouseDown}
               className={cn(
-                "relative h-[calc(100%-20px)] rounded-full w-2 cursor-col-resize pointer-events-auto transition-colors",
+                "relative h-full rounded-full w-2 cursor-col-resize pointer-events-auto transition-colors",
                 {
-                  "bg-primary mx-4": isDragging,
-                  "hover:bg-primary/50": !isDragging,
+                  "bg-primary mx-2": isDragging,
+                  "bg-[#18181b]": !isDragging,
                 }
               )}
               style={{ zIndex: 9999 }}
@@ -258,24 +297,31 @@ const TheatreModeViewComponent = ({
               <div className="flex items-center justify-center bg-red-500">
                 <div className="w-1 rounded-full" />
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Чат - отдельное окно */}
           {stream.chatUrl && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              initial={{ opacity: 0, x: 30, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+              transition={{
+                duration: 0.5,
+                delay: 0.1,
+                ease: [0.16, 1, 0.3, 1],
+                opacity: { duration: 0.4 },
+                x: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+                scale: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+              }}
               className={cn(
-                "relative shrink-0 h-full bg-base-100 rounded-lg shadow-2xl overflow-hidden transition-opacity pointer-events-auto",
+                "relative shrink-0 h-full bg-base-100 shadow-2xl overflow-hidden transition-opacity pointer-events-auto",
                 { "pointer-events-none": isDragging }
               )}
               style={{
-                width: `calc(${chatWidthRatio * 100}% - 0.5rem)`,
-                maxWidth: `calc(${chatWidthRatio * 100}% - 0.5rem)`,
-                maxHeight: "calc(100vh - 1rem)",
+                width: `calc(${chatWidthRatio * 100}%)`,
+                maxWidth: `calc(${chatWidthRatio * 100}%)`,
+                maxHeight: "100vh",
                 zIndex: 106, // Чат поверх фона
               }}
               onClick={(e) => e.stopPropagation()}
@@ -286,10 +332,14 @@ const TheatreModeViewComponent = ({
 
           {/* Кнопка закрытия - поверх всего */}
           <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2, delay: 0.1 }}
+            initial={{ opacity: 0, scale: 0.8, rotate: -90 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.8, rotate: -90 }}
+            transition={{
+              duration: 0.4,
+              delay: 0.3,
+              ease: [0.16, 1, 0.3, 1],
+            }}
             onClick={onClose}
             className="absolute btn-alert right-2 top-2 btn btn-circle btn-sm pointer-events-auto hover:scale-125 transition-all duration-200"
             style={{ zIndex: 107 }}

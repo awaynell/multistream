@@ -62,7 +62,7 @@ export const StreamPlayer = memo(function StreamPlayer({
       iframe.style.height = "100%";
       iframe.style.pointerEvents = "auto";
       iframe.style.transition = "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)"; // Плавный переход
-      iframe.style.borderRadius = "8px"; // Округление границ (rounded-lg)
+      // iframe.style.borderRadius = "8px"; // Округление границ (rounded-lg)
       container.appendChild(iframe);
       iframes.set(streamId, iframe);
     }
